@@ -7,6 +7,10 @@
 
 #define X 60
 #define Y 20
+#define EMPTY 0
+#define PLAYER 1
+#define ENEMY_ALIVE 2
+#define ENEMY_DEAD 3
 
 typedef struct PLAYERDATA{
   int point;
@@ -26,22 +30,23 @@ typedef struct FIELDDATA{
 //data データの初期化
 void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]);//layer 1
 
-//game　ゲームの管理
+//game ゲームの管理
 int  game_play(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]);//layer 1
 void rmap_disp(fielddata fdata[Y][X]);//layer 2
 void player_move(int ope,playerdata **pdata,fielddata fdata[Y][X]);//layer 2
 void enemys_move(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]);//layer 2
 int  player_alive(playerdata **pdata,fielddata fdata[Y][X]);//layer 2
 int  enemys_alive(int num,enemydata edata[40],fielddata fdata[Y][X]);//layer 2
+bool itsinspace(int x,int y);
 
-//util　手続きの関数化
-double dist(double x_1,double y_1,double x_2,double y_2);
+//util 手続きの関数化
+int  get_valid_input(int min,int max);
 int  comp(int a,int b,int c);
 int  arraymin(int num,double array[]);
-bool itsinspace(int x,int y);
-bool thereisenemy(int num,playerdata pdata,enemydata edata[40]);
+double dist(double x_1,double y_1,double x_2,double y_2);
 void write(playerdata pdata);
 
+//レベルに応じてループをさせる
 int main(){//layer 0
   srand((unsigned)time(NULL));
   playerdata pdata;
@@ -54,13 +59,14 @@ int main(){//layer 0
     data_init(num,&pdata,edata,fdata);
     int cont=game_play(num,&pdata,edata,fdata);
     if(cont==1){
-      printf("You died at level%d. Your score:%d",pdata.level,pdata.point);
+      printf("You died at level %d.Your score is %d.",pdata.level,pdata.point);
       write(pdata);
       return 0;
     }
   }
 }
-  
+
+//データ初期化
 void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]){
   pdata->x=rand()%X;
   pdata->y=rand()%Y;
@@ -73,47 +79,52 @@ void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][
     for(int j=0;j<X;j++){
       for(int k=0;k<num;k++){
         if(edata[k].x==j&&edata[k].y==i&&edata[k].isdead==false){
-          fdata[i][j].state=2;
+          fdata[i][j].state=ENEMY_ALIVE;
           break;
         }
         else if(edata[k].x==j&&edata[k].y==i&&edata[k].isdead==true){
-          fdata[i][j].state=3;
+          fdata[i][j].state=ENEMY_DEAD;
           break;
         }
         else{
-          fdata[i][j].state=0;
+          fdata[i][j].state=EMPTY;
         }
       }
       if(pdata->x==j&&pdata->y==i){
-        fdata[i][j].state=1;
+        fdata[i][j].state=PLAYER;
       }
     }
   }
 }
 
+//ゲームのループ
 int  game_play(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]){
-  int ope;
+  int ope=-1;
   int prevenemysalive=num;
   while(1){
+    rmap_disp(fdata);
+    ope=get_valid_input(0,10);
+    if(ope!=10){
+      player_move(ope,&pdata,fdata);
+      enemys_move(num,pdata,edata,fdata);
+    }
+    if(ope==10){
+      while(enemys_alive(num,edata,fdata)!=0&&player_alive(&pdata,fdata)==1){
+        rmap_disp(fdata);
+        enemys_move(num,pdata,edata,fdata);
+      }
+      break;
+    }    
     int enemysalive=enemys_alive(num,edata,fdata);
     int playeralive=player_alive(&pdata,fdata);
-    if(playeralive==0){return 1;}
-    else if(enemysalive==0){return 0;}
-    rmap_disp(fdata);
-    printf("0 1 2\n3 @ 4\n5 6 7\n");
-    printf("$Select direction.(0~7:direction,8:stop,9:warp)>");
-    scanf("%d",&ope);
-    player_move(ope,&pdata,fdata);
-    enemys_move(num,pdata,edata,fdata);
     pdata->point+=(prevenemysalive-enemysalive);
     prevenemysalive=enemysalive;
-    enemysalive=enemys_alive(num,edata,fdata);
-    playeralive=player_alive(&pdata,fdata);
     if(playeralive==0){return 1;}
     else if(enemysalive==0){return 0;}
   }
 }
 
+//マップ表示
 void rmap_disp(fielddata fdata[Y][X]){
   printf(" ");
   for(int i=0;i<X;i++){
@@ -130,7 +141,6 @@ void rmap_disp(fielddata fdata[Y][X]){
     }
     printf("|\n");
   }
-  //下部
   printf(" ");
   for(int i=0;i<X;i++){
     printf("-");
@@ -138,81 +148,83 @@ void rmap_disp(fielddata fdata[Y][X]){
   printf("\n");
 }
 
+//プレイヤーの行動
 void player_move(int ope,playerdata **pdata,fielddata fdata[Y][X]){
   int randx=rand()%X;
   int randy=rand()%Y;
   switch(ope){
     case 0:
       if(itsinspace((*pdata)->x-1,(*pdata)->y-1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y-1][(*pdata)->x-1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y-1][(*pdata)->x-1].state=PLAYER;
         (*pdata)->x--;
         (*pdata)->y--;
       }
       break;
     case 1:
       if(itsinspace((*pdata)->x,(*pdata)->y-1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y-1][(*pdata)->x].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y-1][(*pdata)->x].state=PLAYER;
         (*pdata)->y--;
       }
       break;
     case 2:
       if(itsinspace((*pdata)->x+1,(*pdata)->y-1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y-1][(*pdata)->x+1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y-1][(*pdata)->x+1].state=PLAYER;
         (*pdata)->x++;
         (*pdata)->y--;
       }
       break;
     case 3:
       if(itsinspace((*pdata)->x-1,(*pdata)->y)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y][(*pdata)->x-1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y][(*pdata)->x-1].state=PLAYER;
         (*pdata)->x--;
       }
       break;
     case 4:
       if(itsinspace((*pdata)->x+1,(*pdata)->y)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y][(*pdata)->x+1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y][(*pdata)->x+1].state=PLAYER;
         (*pdata)->x++;
       }
       break;
     case 5:
       if(itsinspace((*pdata)->x-1,(*pdata)->y+1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y+1][(*pdata)->x-1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y+1][(*pdata)->x-1].state=PLAYER;
         (*pdata)->x--;
         (*pdata)->y++;
       }
       break;
     case 6:
       if(itsinspace((*pdata)->x,(*pdata)->y+1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y+1][(*pdata)->x].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y+1][(*pdata)->x].state=PLAYER;
         (*pdata)->y++;
       }
       break;
     case 7:
       if(itsinspace((*pdata)->x+1,(*pdata)->y+1)==true){
-        fdata[(*pdata)->y][(*pdata)->x].state=0;
-        fdata[(*pdata)->y+1][(*pdata)->x+1].state=1;
+        fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+        fdata[(*pdata)->y+1][(*pdata)->x+1].state=PLAYER;
         (*pdata)->x++;
         (*pdata)->y++;
       }
       break;
     case 8:
-      break;
-    case 9:
       while(itsinspace(randx,randy)==false){
         randx=rand()%X;
         randy=rand()%Y;
       }
-      fdata[(*pdata)->y][(*pdata)->x].state=0;
-      fdata[randy][randx].state=1;
+      fdata[(*pdata)->y][(*pdata)->x].state=EMPTY;
+      fdata[randy][randx].state=PLAYER;
       (*pdata)->x=randx;
       (*pdata)->y=randy;
+      break;
+    case 9:
+      
       break;
     default:
       printf("$Input error. Try again.\n");
@@ -220,6 +232,7 @@ void player_move(int ope,playerdata **pdata,fielddata fdata[Y][X]){
   }
 }
 
+//敵の行動
 void enemys_move(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]){
   for(int i=0;i<num;i++){
     if(edata[i].isdead==false){
@@ -236,60 +249,60 @@ void enemys_move(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y
       switch(distmin){
         case 0:
           if(itsinspace(edata[i].x-1,edata[i].y-1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y-1][edata[i].x-1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y-1][edata[i].x-1].state=ENEMY_ALIVE;
             edata[i].x--;
             edata[i].y--;
           }
           break;
         case 1:
           if(itsinspace(edata[i].x,edata[i].y-1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y-1][edata[i].x].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y-1][edata[i].x].state=ENEMY_ALIVE;
             edata[i].y--;
           }
           break;
         case 2:
           if(itsinspace(edata[i].x+1,edata[i].y-1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y-1][edata[i].x+1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y-1][edata[i].x+1].state=ENEMY_ALIVE;
             edata[i].x++;
             edata[i].y--;
           }
           break;
         case 3:
           if(itsinspace(edata[i].x-1,edata[i].y)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y][edata[i].x-1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y][edata[i].x-1].state=ENEMY_ALIVE;
             edata[i].x--;
           }
           break;
         case 4:
           if(itsinspace(edata[i].x+1,edata[i].y)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y][edata[i].x+1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y][edata[i].x+1].state=ENEMY_ALIVE;
             edata[i].x++;
           }
           break;
         case 5:
           if(itsinspace(edata[i].x-1,edata[i].y+1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y+1][edata[i].x-1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y+1][edata[i].x-1].state=ENEMY_ALIVE;
             edata[i].x--;
             edata[i].y++;
           }
           break;
         case 6:
           if(itsinspace(edata[i].x,edata[i].y+1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y+1][edata[i].x].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y+1][edata[i].x].state=ENEMY_ALIVE;
             edata[i].y++;
           }
           break;
         case 7:
           if(itsinspace(edata[i].x+1,edata[i].y+1)==true){
-            fdata[edata[i].y][edata[i].x].state=0;
-            fdata[edata[i].y+1][edata[i].x+1].state=2;
+            fdata[edata[i].y][edata[i].x].state=EMPTY;
+            fdata[edata[i].y+1][edata[i].x+1].state=ENEMY_ALIVE;
             edata[i].x++;
             edata[i].y++;
           }
@@ -299,13 +312,15 @@ void enemys_move(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y
   } 
 }
 
+//プレイヤー生存確認
 int player_alive(playerdata **pdata,fielddata fdata[Y][X]){
-  if(fdata[(*pdata)->y][(*pdata)->x].state==0||fdata[(*pdata)->y][(*pdata)->x].state==1){
+  if(fdata[(*pdata)->y][(*pdata)->x].state==EMPTY||fdata[(*pdata)->y][(*pdata)->x].state==PLAYER){
     return 1;
   }
   return 0;
 }
 
+//敵生存確認
 int enemys_alive(int num,enemydata edata[40],fielddata fdata[Y][X]){
   int alive=num;
   for (int i=0;i<num;i++){
@@ -324,22 +339,50 @@ int enemys_alive(int num,enemydata edata[40],fielddata fdata[Y][X]){
   return alive;
 }
 
+//要素のはみ出し監視
+bool itsinspace(int x,int y){
+  if(x<X&&x>=0&&y<Y&&y>=0){
+    return true;
+  }
+  return false;
+}
+
+//入力の受付
+int get_valid_input(int min,int max){
+  int input;
+  printf("0 1 2\n3 @ 4\n5 6 7\n");
+  printf("$Enter a number between %d and %d:>", min, max);
+  while(1){
+    if(scanf("%d",&input)==1&&input>=min&&input<=max) {
+      break;
+    }
+    else{
+      printf("$Invalid input. Please enter a number between %d and %d:>", min, max);
+      while (getchar() != '\n'); // Clear input buffer
+    }
+  }
+  return input;
+}
+
+//ユークリッド距離計算
 double dist(double x_1,double y_1,double x_2,double y_2){
   double dist=sqrt(pow((x_1-x_2),2)+pow((y_1-y_2),2));
   return dist;
 }
 
-int comp(int a,int b,int c){//c==0 小さいほうを返す, c==1 大きい方を返す
-  if(c==0){
+//大小比較
+int comp(int a,int b,int c){
+  if(c==0){//c==0 小さいほうを返す
     if(a<b){return a;}
     else{return b;}
   }
-  if(c==1){
+  if(c==1){//c==1 大きい方を返す
     if(a>b){return a;}
     else{return b;}
   }
 }
 
+//最小の配列要素を返す
 int arraymin(int num,double array[]){
   double min=array[0];
   int min_arg=0;
@@ -352,18 +395,10 @@ int arraymin(int num,double array[]){
   return min_arg;
 }
 
-bool itsinspace(int x,int y){
-  if(x<X&&x>=0&&y<Y&&y>=0){
-    return true;
-  }
-  return false;
-}
 
-bool thereisenemy(int num,playerdata pdata,enemydata edata[40]){
-  for(int i=0;i<num;i++){
-    if(pdata.x==edata[i].x&&pdata.y==edata[i].y){
-      return true;
-    }
-  }
-  return false;
+//ファイル書き込み
+void write(playerdata pdata){
+  FILE *fp;
+  fp=fopen("score.txt","a"); 
+  fprintf(fp,"%d\n",pdata.point);
 }
