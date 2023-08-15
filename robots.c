@@ -29,6 +29,7 @@ typedef struct FIELDDATA{
 
 //data データの初期化
 void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]);//layer 1
+void data_disp(int num,playerdata pdata,enemydata edata[40],fielddata fdata[Y][X]);
 
 //game ゲームの管理
 int  game_play(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]);//layer 1
@@ -57,6 +58,7 @@ int main(){//layer 0
   for(pdata.level=1;;pdata.point+=pdata.level*10,pdata.level++){
     num=comp(pdata.level*5,40,0);
     data_init(num,&pdata,edata,fdata);
+    data_disp(num,pdata,edata,fdata);
     int cont=game_play(num,&pdata,edata,fdata);
     if(cont==1){
       printf("You died at level %d.Your score is %d.",pdata.level,pdata.point);
@@ -68,9 +70,12 @@ int main(){//layer 0
 
 //データ初期化
 void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]){
+  int enemyx[num],enemyy[num];
+  memset(enemyx,-1,sizeof(enemyx));
+  memset(enemyy,-1,sizeof(enemyy));
   pdata->x=rand()%X;
   pdata->y=rand()%Y;
-  for(int i=0,flag=0;i<num;i++){
+  for(int i=0;i<num;i++){
     edata[i].x=rand()%X;
     edata[i].y=rand()%Y;
     edata[i].isdead=false;
@@ -97,6 +102,22 @@ void data_init(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][
   }
 }
 
+void data_disp(int num,playerdata pdata,enemydata edata[40],fielddata fdata[Y][X]){
+  printf("point:%d\nlevel:%d\n",pdata.point,pdata.level);
+  printf("player:(%d %d)\n",pdata.x,pdata.y);
+  for(int i=0;i<num;i++){
+    printf("enemy%d:(%d %d)\n",i,edata[i].x,edata[i].y);
+  }
+  printf("field:\n");
+  for(int i=0;i<Y;i++){
+    for(int j=0;j<X;j++){
+      printf("%d ",fdata[i][j].state);
+    }
+    printf("\n");
+  }
+  printf("\n");
+}
+
 //ゲームのループ
 int  game_play(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][X]){
   int ope=-1;
@@ -104,19 +125,29 @@ int  game_play(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y][
   while(1){
     rmap_disp(fdata);
     ope=get_valid_input(0,10);
-    if(ope!=10){
-      player_move(ope,&pdata,fdata);
-      enemys_move(num,pdata,edata,fdata);
-    }
     if(ope==10){
-      while(enemys_alive(num,edata,fdata)!=0&&player_alive(&pdata,fdata)==1){
-        rmap_disp(fdata);
+      int enemysalive;
+      int playeralive;
+      while(playeralive!=0&&enemysalive!=0){
         enemys_move(num,pdata,edata,fdata);
+        enemysalive=enemys_alive(num,edata,fdata);
+        playeralive=player_alive(&pdata,fdata);
+        for(int i=0;i<num;i++){
+          printf("robots %d:(%d,%d)\n",i,edata[i].x,edata[i].y);
+        }
+        pdata->point+=(prevenemysalive-enemysalive)*2;
+        prevenemysalive=enemysalive;
+        if(playeralive==0){return 1;}
+        else if(enemysalive==0){return 0;}
       }
-      break;
-    }    
+    }
+    player_move(ope,&pdata,fdata);
+    enemys_move(num,pdata,edata,fdata);
     int enemysalive=enemys_alive(num,edata,fdata);
     int playeralive=player_alive(&pdata,fdata);
+    for(int i=0;i<num;i++){
+      printf("robots %d:(%d,%d)\n",i,edata[i].x,edata[i].y);
+    }
     pdata->point+=(prevenemysalive-enemysalive);
     prevenemysalive=enemysalive;
     if(playeralive==0){return 1;}
@@ -224,7 +255,6 @@ void player_move(int ope,playerdata **pdata,fielddata fdata[Y][X]){
       (*pdata)->y=randy;
       break;
     case 9:
-      
       break;
     default:
       printf("$Input error. Try again.\n");
@@ -309,7 +339,7 @@ void enemys_move(int num,playerdata *pdata,enemydata edata[40],fielddata fdata[Y
           break;
       }
     }
-  } 
+  }
 }
 
 //プレイヤー生存確認
@@ -394,7 +424,6 @@ int arraymin(int num,double array[]){
   }
   return min_arg;
 }
-
 
 //ファイル書き込み
 void write(playerdata pdata){
